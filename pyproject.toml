@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["simulation_db*"]
+exclude = ["tests*", "docs*", "examples*", "scripts*", "docker*"]
+
+[tool.sphinx]
+project = "simulation-db"
+
+[tool.pytest.ini_options]
+testpaths = "simulation_db/tests"
+python_files = "*.py"
+log_cli=false
+log_level="DEBUG"
+log_format = "%(asctime)s %(levelname)s %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+log_file = "simulation_db/logging/logs/pytest-logs.txt"
+
+[tool.pyright]
+pythonVersion = "3.13"
+include = ["simulation_db", "bin"]
+exclude = [ "**/__pycache__"]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[project]
+name = "simulation-db"
+version = "0.0.1"
+description = "Simulation run and state storage backed by PostgreSQL (scaffold)"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+	"fastapi>=0.95",
+	"uvicorn[standard]>=0.22",
+	"SQLAlchemy>=2.0.0",
+	"psycopg2-binary>=2.9.0",
+	"alembic>=1.10",
+	"python-dotenv>=1.0",
+	"pydantic>=1.10,<3",
+	"gymnasium>=0.29.0",
+	"numpy>=1.25",
+]
+
+[project.optional-dependencies]
+dev = [
+	"pytest>=7.0",
+	"sphinx>=5.0",
+	"sphinx-rtd-theme>=1.0",
+	"httpx>=0.24",
+]
+ml = [
+	"torch>=2.0",
+]
