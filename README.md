@@ -2,6 +2,8 @@
 
 A **git-like branching database** for reinforcement learning simulations. Store, branch, and analyze your RL experiments with the same flexibility as version control.
 
+This initial boilerplate uses [CartPoleV1](https://gymnasium.farama.org/environments/classic_control/cart_pole/) for demonstration. Code is located in `examples/`.
+
 ## Features
 
 - 🌳 **Git-tree structure**: Branch from any state to explore alternative trajectories
