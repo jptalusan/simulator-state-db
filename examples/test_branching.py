@@ -32,13 +32,18 @@ def main():
     
     # Drop all tables first to ensure clean state
     # from simulation_db.database import drop_all_tables
-    print("Dropping all tables...")
-    # drop_all_tables()
+    print("Dropping and recreating database...")
     drop_and_recreate_database()
-    print("Tables dropped.\n")
+    
+    # Recreate all tables
+    print("Creating tables...")
+    from simulation_db.database import init_db
+    init_db()
+    print("Tables created successfully!")
+    print()
     
     # Import and run the example
-    from cartpole_branching_example import main as run_example
+    from cartpole_branching_api_example import main as run_example
     
     try:
         run_example()

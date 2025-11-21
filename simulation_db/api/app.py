@@ -283,6 +283,7 @@ def create_state(payload: StateCreate, db: Session = Depends(get_db)):
         return {
             "id": state.id,
             "step_number": state.step_number,
+            "observation": state.observation,
             "done": state.done,
             "parent_state_id": state.parent_state_id,
             "created_at": state.created_at.isoformat()
@@ -337,6 +338,7 @@ def add_state_to_run(run_id: str, payload: StateCreate, db: Session = Depends(ge
         return {
             "id": state.id,
             "step_number": state.step_number,
+            "observation": state.observation,
             "run_id": run_id,
             "done": state.done,
             "created_at": state.created_at.isoformat()
