@@ -23,6 +23,27 @@ This database structure implements a git-like branching system for reinforcement
 
 ## Database Schema
 
+### Summary
+```
+Simulation (PK: id)
+    ↓ 1:many
+SimulationRun (PK: id)
+    ├── FK: simulation_id → Simulation.id
+    ├── FK: parent_run_id → SimulationRun.id (self-referential for branching)
+    ├── FK: root_state_id → State.id (where this run starts)
+    ├── FK: current_state_id → State.id (latest state)
+    └── FK: branch_point_state_id → State.id (where branch occurred)
+    
+State (PK: id)
+    ├── FK: parent_state_id → State.id (self-referential for state tree)
+    └── many:many with SimulationRun through run_state_sequence
+    
+run_state_sequence (association table)
+    ├── FK: run_id → SimulationRun.id
+    ├── FK: state_id → State.id
+    └── sequence_order (ordering within run)
+```
+
 ### 1. State Table (The Core)
 
 ```python
