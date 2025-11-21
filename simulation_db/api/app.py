@@ -6,6 +6,13 @@ from sqlalchemy.orm import Session
 from simulation_db.database import get_db
 from simulation_db.models import Simulation
 from simulation_db.managers.simulation_manager import SimulationManager
+from simulation_db.managers.state_manager import StateManager
+from simulation_db.schemas import (
+    SimulationCreate,
+    RunCreate,
+    BranchCreate,
+    StateCreate
+)
 
 app = FastAPI(
     title="simulation-db API",
@@ -159,3 +166,232 @@ def get_run_states(run_id: str, db: Session = Depends(get_db)):
         "total_states": len(states),
         "states": states
     }
+
+
+# POST endpoints for creating resources
+
+@app.post("/simulations", tags=["simulations"], status_code=201)
+def create_simulation(payload: SimulationCreate, db: Session = Depends(get_db)):
+    """
+    Create a new simulation configuration.
+    
+    Args:
+        payload (SimulationCreate): Simulation configuration data.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Created simulation ID and metadata.
+    """
+    sim_manager = SimulationManager(db)
+    
+    try:
+        simulation = sim_manager.create_simulation(
+            name=payload.name,
+            environment_name=payload.environment_name,
+            agent_type=payload.agent_type,
+            agent_config=payload.agent_config,
+            description=payload.description,
+            environment_config=payload.environment_config
+        )
+        
+        return {
+            "id": simulation.id,
+            "name": simulation.name,
+            "environment_name": simulation.environment_name,
+            "agent_type": simulation.agent_type,
+            "created_at": simulation.created_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create simulation: {str(e)}")
+
+
+@app.post("/simulations/{simulation_id}/runs", tags=["simulations"], status_code=201)
+def create_run(simulation_id: str, payload: RunCreate, db: Session = Depends(get_db)):
+    """
+    Create a new run for a simulation.
+    
+    Args:
+        simulation_id (str): ID of the simulation.
+        payload (RunCreate): Run configuration data.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Created run ID and metadata.
+    """
+    from simulation_db.models import State
+    
+    # Verify simulation exists
+    simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    
+    # Verify root state exists
+    root_state = db.query(State).filter(State.id == payload.root_state_id).first()
+    if not root_state:
+        raise HTTPException(status_code=404, detail="Root state not found")
+    
+    sim_manager = SimulationManager(db)
+    
+    try:
+        run = sim_manager.create_run(
+            simulation_id=simulation_id,
+            name=payload.name,
+            root_state=root_state,
+            description=payload.description,
+            config_overrides=payload.config_overrides
+        )
+        
+        return {
+            "id": run.id,
+            "name": run.name,
+            "simulation_id": run.simulation_id,
+            "root_state_id": run.root_state_id,
+            "status": run.status,
+            "created_at": run.created_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create run: {str(e)}")
+
+
+@app.post("/states", tags=["states"], status_code=201)
+def create_state(payload: StateCreate, db: Session = Depends(get_db)):
+    """
+    Create a new state.
+    
+    Args:
+        payload (StateCreate): State data.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Created state ID and metadata.
+    """
+    state_manager = StateManager(db)
+    
+    try:
+        state = state_manager.create_state(
+            observation=payload.observation,
+            step_number=payload.step_number,
+            action=payload.action,
+            reward=payload.reward,
+            done=payload.done,
+            truncated=payload.truncated,
+            parent_state_id=payload.parent_state_id,
+            info=payload.info,
+            extra_metadata=payload.extra_metadata
+        )
+        
+        return {
+            "id": state.id,
+            "step_number": state.step_number,
+            "done": state.done,
+            "parent_state_id": state.parent_state_id,
+            "created_at": state.created_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create state: {str(e)}")
+
+
+@app.post("/runs/{run_id}/states", tags=["runs"], status_code=201)
+def add_state_to_run(run_id: str, payload: StateCreate, db: Session = Depends(get_db)):
+    """
+    Create a new state and add it to a run's sequence.
+    
+    This is the most common operation - it creates a state and automatically
+    adds it to the run_state_sequence table.
+    
+    Args:
+        run_id (str): ID of the run.
+        payload (StateCreate): State data.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Created state ID and metadata.
+    """
+    from simulation_db.models import SimulationRun
+    
+    # Verify run exists
+    run = db.query(SimulationRun).filter(SimulationRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    state_manager = StateManager(db)
+    sim_manager = SimulationManager(db)
+    
+    try:
+        # Create the state
+        state = state_manager.create_state(
+            observation=payload.observation,
+            step_number=payload.step_number,
+            action=payload.action,
+            reward=payload.reward,
+            done=payload.done,
+            truncated=payload.truncated,
+            parent_state_id=payload.parent_state_id,
+            info=payload.info,
+            extra_metadata=payload.extra_metadata
+        )
+        
+        # Add to run sequence
+        sim_manager.add_state_to_run(run, state)
+        
+        return {
+            "id": state.id,
+            "step_number": state.step_number,
+            "run_id": run_id,
+            "done": state.done,
+            "created_at": state.created_at.isoformat()
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to add state to run: {str(e)}")
+
+
+@app.post("/runs/branch", tags=["runs"], status_code=201)
+def create_branch(payload: BranchCreate, db: Session = Depends(get_db)):
+    """
+    Create a new branch from an existing run at a specific state.
+    
+    This creates a new run that shares history with the parent run up to
+    the branch point, then can diverge with different configuration.
+    
+    Args:
+        payload (BranchCreate): Branch configuration data.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Created branch run ID and metadata.
+    """
+    from simulation_db.models import SimulationRun, State
+    
+    # Verify parent run exists
+    parent_run = db.query(SimulationRun).filter(SimulationRun.id == payload.parent_run_id).first()
+    if not parent_run:
+        raise HTTPException(status_code=404, detail="Parent run not found")
+    
+    # Verify branch point state exists
+    branch_state = db.query(State).filter(State.id == payload.branch_point_state_id).first()
+    if not branch_state:
+        raise HTTPException(status_code=404, detail="Branch point state not found")
+    
+    sim_manager = SimulationManager(db)
+    
+    try:
+        branch_run = sim_manager.branch_from_state(
+            parent_run=parent_run,
+            branch_point_state=branch_state,
+            new_run_name=payload.new_run_name,
+            config_overrides=payload.config_overrides,
+            description=payload.description
+        )
+        
+        return {
+            "id": branch_run.id,
+            "name": branch_run.name,
+            "parent_run_id": branch_run.parent_run_id,
+            "branch_point_state_id": branch_run.branch_point_state_id,
+            "simulation_id": branch_run.simulation_id,
+            "status": branch_run.status,
+            "created_at": branch_run.created_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create branch: {str(e)}")
