@@ -213,6 +213,14 @@ python scripts/init_db.py
 python examples/cartpole_branching_example.py
 ```
 
+## Development (for other env)
+You only need to modify:
+
+1. 📝 Simulation configuration (environment name, agent type)
+2. 📝 How you serialize observations/actions to JSON
+3. 📝 (Optional) How you save/restore environment internal state
+**Everything else works automatically** because the design uses flexible JSON storage and environment-agnostic abstractions!
+
 ## Performance Tips
 
 - Use pagination for large result sets

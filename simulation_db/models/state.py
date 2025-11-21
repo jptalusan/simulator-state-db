@@ -6,7 +6,7 @@ children (branches). This allows for branching simulations at any point.
 
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, DateTime, 
-    ForeignKey, JSON, Text, Index
+    ForeignKey, JSON, Index
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime

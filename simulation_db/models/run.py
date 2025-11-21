@@ -11,8 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
-
-from .base import Base
+from simulation_db.models import State, Base
 
 
 # Association table for many-to-many between SimulationRun and State
