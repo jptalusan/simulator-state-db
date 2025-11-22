@@ -313,6 +313,74 @@ def main():
     tree_data = response.json()
     print_tree(tree_data['tree'])
     
+    # 11. Show divergence analysis
+    print("\n" + "=" * 80)
+    print("STATE TRAVERSAL - SHOWING DIVERGENCE")
+    print("=" * 80)
+    
+    response = requests.get(f"{API_BASE_URL}/runs/{main_run_id}/compare/{branch_run_id}")
+    response.raise_for_status()
+    comparison = response.json()
+    
+    # Calculate rewards for each segment
+    shared_reward = sum(s['reward'] or 0 for s in comparison['shared'])
+    main_divergent_reward = sum(s['reward'] or 0 for s in comparison['run1_only']) if comparison['run1_only'] else 0
+    branch_divergent_reward = sum(s['reward'] or 0 for s in comparison['run2_only']) if comparison['run2_only'] else 0
+    
+    print("\nShared history (both runs follow identical path):")
+    print(f"  Total shared states: {comparison['shared_count']}")
+    print(f"  Total reward (shared segment): {shared_reward:.2f}")
+    if comparison['shared_count'] >= 5:
+        print("  Last 5 states before divergence:")
+        for state in comparison['shared'][-5:]:
+            obs_preview = state['observation'][:2] if state['observation'] else []
+            print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+    elif comparison['shared']:
+        print("  All shared states:")
+        for state in comparison['shared']:
+            obs_preview = state['observation'][:2] if state['observation'] else []
+            print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+    
+    if comparison['divergence_point']:
+        print(f"\n  >>> DIVERGENCE POINT: Step {comparison['divergence_point']['step_number']} <<<")
+    
+    print("\nMain branch continuation (lr=0.001):")
+    print(f"  States after divergence: {comparison['run1_unique_count']}")
+    if comparison['run1_only']:
+        print(f"  Steps {comparison['run1_only'][0]['step_number']} to {comparison['run1_only'][-1]['step_number']}")
+        print(f"  Total reward (divergent segment): {main_divergent_reward:.2f}")
+        print(f"  Total reward (shared + divergent): {shared_reward + main_divergent_reward:.2f}")
+        if comparison['run1_unique_count'] >= 5:
+            print("  Last 5 states:")
+            for state in comparison['run1_only'][-5:]:
+                obs_preview = state['observation'][:2] if state['observation'] else []
+                print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+        else:
+            for state in comparison['run1_only']:
+                obs_preview = state['observation'][:2] if state['observation'] else []
+                print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+    
+    print("\nDivergent branch continuation (lr=0.01, 10x higher):")
+    print(f"  States after divergence: {comparison['run2_unique_count']}")
+    if comparison['run2_only']:
+        print(f"  Steps {comparison['run2_only'][0]['step_number']} to {comparison['run2_only'][-1]['step_number']}")
+        print(f"  Total reward (divergent segment): {branch_divergent_reward:.2f}")
+        print(f"  Total reward (shared + divergent): {shared_reward + branch_divergent_reward:.2f}")
+        if comparison['run2_unique_count'] >= 5:
+            print("  Last 5 states:")
+            for state in comparison['run2_only'][-5:]:
+                obs_preview = state['observation'][:2] if state['observation'] else []
+                print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+        else:
+            for state in comparison['run2_only']:
+                obs_preview = state['observation'][:2] if state['observation'] else []
+                print(f"    Step {state['step_number']}: reward={state['reward']}, obs={obs_preview}, done={state['done']}")
+    
+    print("\nTotal states in database:")
+    print(f"  Main branch: {runs[0]['total_steps']} states")
+    print(f"  Divergent branch: {runs[1]['total_steps']} states")
+    print(f"  Unique states (counting shared once): {comparison['shared_count'] + comparison['run1_unique_count'] + comparison['run2_unique_count']}")
+    
     env.close()
     env_branch.close()
     

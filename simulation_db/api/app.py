@@ -284,8 +284,13 @@ def create_state(payload: StateCreate, db: Session = Depends(get_db)):
             "id": state.id,
             "step_number": state.step_number,
             "observation": state.observation,
+            "action": state.action,
+            "reward": state.reward,
             "done": state.done,
+            "truncated": state.truncated,
             "parent_state_id": state.parent_state_id,
+            "info": state.info,
+            "extra_metadata": state.extra_metadata,
             "created_at": state.created_at.isoformat()
         }
     except Exception as e:
@@ -339,13 +344,74 @@ def add_state_to_run(run_id: str, payload: StateCreate, db: Session = Depends(ge
             "id": state.id,
             "step_number": state.step_number,
             "observation": state.observation,
-            "run_id": run_id,
+            "action": state.action,
+            "reward": state.reward,
             "done": state.done,
+            "truncated": state.truncated,
+            "parent_state_id": state.parent_state_id,
+            "info": state.info,
+            "extra_metadata": state.extra_metadata,
+            "run_id": run_id,
             "created_at": state.created_at.isoformat()
         }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to add state to run: {str(e)}")
+
+
+@app.get("/runs/{run1_id}/compare/{run2_id}", tags=["runs"])
+def compare_runs(run1_id: str, run2_id: str, db: Session = Depends(get_db)):
+    """
+    Compare two runs to identify shared states and divergence points.
+    
+    Args:
+        run1_id (str): ID of the first run.
+        run2_id (str): ID of the second run.
+        db (Session): SQLAlchemy database session.
+    
+    Returns:
+        Dict: Comparison results with shared states, unique states, and divergence point.
+    """
+    from simulation_db.models import SimulationRun
+    
+    # Verify both runs exist
+    run1 = db.query(SimulationRun).filter(SimulationRun.id == run1_id).first()
+    if not run1:
+        raise HTTPException(status_code=404, detail="Run 1 not found")
+    
+    run2 = db.query(SimulationRun).filter(SimulationRun.id == run2_id).first()
+    if not run2:
+        raise HTTPException(status_code=404, detail="Run 2 not found")
+    
+    state_manager = StateManager(db)
+    
+    try:
+        comparison = state_manager.compare_runs(run1, run2)
+        
+        def state_to_dict(state):
+            return {
+                "id": state.id,
+                "step_number": state.step_number,
+                "observation": state.observation,
+                "action": state.action,
+                "reward": state.reward,
+                "done": state.done,
+                "truncated": state.truncated,
+            }
+        
+        return {
+            "run1_id": run1_id,
+            "run2_id": run2_id,
+            "shared": [state_to_dict(s) for s in comparison['shared']],
+            "run1_only": [state_to_dict(s) for s in comparison['run1_only']],
+            "run2_only": [state_to_dict(s) for s in comparison['run2_only']],
+            "divergence_point": state_to_dict(comparison['divergence_point']) if comparison['divergence_point'] else None,
+            "shared_count": len(comparison['shared']),
+            "run1_unique_count": len(comparison['run1_only']),
+            "run2_unique_count": len(comparison['run2_only']),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to compare runs: {str(e)}")
 
 
 @app.post("/runs/branch", tags=["runs"], status_code=201)

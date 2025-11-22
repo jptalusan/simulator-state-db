@@ -30,16 +30,10 @@ def main():
     print(f"Database: {db_file}")
     print()
     
-    # Drop all tables first to ensure clean state
-    # from simulation_db.database import drop_all_tables
-    print("Dropping and recreating database...")
-    drop_and_recreate_database()
-    
-    # Recreate all tables
-    print("Creating tables...")
-    from simulation_db.database import init_db
-    init_db()
-    print("Tables created successfully!")
+    # Drop and recreate tables (safer for API since server can keep its connection)
+    print("Dropping and recreating tables...")
+    drop_and_recreate_tables()
+    print("Tables ready!")
     print()
     
     # Import and run the example
@@ -53,14 +47,54 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        # Clean up database connections
+        try:
+            from simulation_db.database import engine as db_engine
+            if db_engine:
+                db_engine.dispose()
+                print("\nDatabase connections closed")
+        except Exception as e:
+            print(f"\nNote: Could not dispose engine: {e}")
+
+def drop_and_recreate_tables():
+    """Drop and recreate all tables without dropping the database.
+    
+    This is safer for the API example since the FastAPI server can continue
+    to use its existing database connection.
+    """
+    from simulation_db.database import engine as db_engine
+    from simulation_db.models.base import Base
+    # Import all models so they're registered with Base
+    from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
+    
+    # Drop all tables
+    Base.metadata.drop_all(bind=db_engine)
+    print("All tables dropped")
+    
+    # Recreate all tables
+    Base.metadata.create_all(bind=db_engine)
+    print("All tables recreated")
+
 
 def drop_and_recreate_database():
     """Drop and recreate the entire PostgreSQL database.
     
     Warning: This will destroy all data!
+    Note: If using with API server, you must restart the server after this.
     """
+    import time
     from sqlalchemy import create_engine, text
 
+    # First, dispose any existing connections from the database module
+    try:
+        from simulation_db.database import engine as db_engine
+        if db_engine:
+            db_engine.dispose()
+            print("Disposed existing database connections")
+    except Exception as e:
+        print(f"Note: Could not dispose existing engine: {e}")
+    
     # Connect to 'postgres' default database (not your app database)
     admin_url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/postgres"
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
@@ -73,6 +107,9 @@ def drop_and_recreate_database():
             WHERE pg_stat_activity.datname = '{POSTGRES_DB}'
               AND pid <> pg_backend_pid()
         """))
+        
+        # Give PostgreSQL a moment to clean up connections
+        time.sleep(0.5)
         
         # Drop the database
         conn.execute(text(f"DROP DATABASE IF EXISTS {POSTGRES_DB}"))
