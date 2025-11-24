@@ -109,7 +109,6 @@ class SimulationRun(Base):
     
     def get_state_sequence(self, session):
         """Return ordered list of states for this run."""
-        from sqlalchemy import select
         stmt = (
             select(State, run_state_sequence.c.sequence_order)
             .join(run_state_sequence, State.id == run_state_sequence.c.state_id)

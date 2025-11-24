@@ -1,8 +1,9 @@
 """State storage and retrieval helpers."""
 
 from typing import Optional, Dict, Any
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from ..models import State
+from simulation_db.models import State, run_state_sequence
 
 
 class StateManager:
@@ -54,7 +55,7 @@ class StateManager:
     
     def get_terminal_states(self) -> list[State]:
         """Get all terminal states (done=True)."""
-        return self.session.query(State).filter(State.done == True).all()
+        return self.session.query(State).filter(State.done).all()
     
     def compare_runs(self, run1, run2) -> dict:
         """Compare two runs and return shared and divergent states.
@@ -65,9 +66,6 @@ class StateManager:
         - run2_only: list of states unique to run2 (after branch point)
         - divergence_point: the state where they diverged (branch point)
         """
-        from sqlalchemy import select
-        from ..models import run_state_sequence
-        
         # Get ordered states for each run
         stmt1 = (
             select(run_state_sequence.c.state_id)

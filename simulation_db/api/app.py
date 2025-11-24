@@ -1,10 +1,11 @@
 """FastAPI application for simulation-db API."""
 
 from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from simulation_db.database import get_db
-from simulation_db.models import Simulation
+from simulation_db.models import Simulation, SimulationRun, State, run_state_sequence
 from simulation_db.managers.simulation_manager import SimulationManager
 from simulation_db.managers.state_manager import StateManager
 from simulation_db.schemas import (
@@ -95,8 +96,6 @@ def list_all_runs(db: Session = Depends(get_db)):
     Returns:
         List[Dict[str, Any]]: A list of all simulation run IDs and metadata.
     """
-    from simulation_db.models import SimulationRun
-    
     runs = db.query(SimulationRun).all()
     return [
         {
@@ -126,9 +125,6 @@ def get_run_states(run_id: str, db: Session = Depends(get_db)):
     Returns:
         Dict: Run metadata and list of states in order.
     """
-    from simulation_db.models import SimulationRun, State, run_state_sequence
-    from sqlalchemy import select
-    
     # Check if run exists
     run = db.query(SimulationRun).filter(SimulationRun.id == run_id).first()
     if not run:
@@ -218,8 +214,6 @@ def create_run(simulation_id: str, payload: RunCreate, db: Session = Depends(get
     Returns:
         Dict: Created run ID and metadata.
     """
-    from simulation_db.models import State
-    
     # Verify simulation exists
     simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
     if not simulation:
@@ -313,8 +307,6 @@ def add_state_to_run(run_id: str, payload: StateCreate, db: Session = Depends(ge
     Returns:
         Dict: Created state ID and metadata.
     """
-    from simulation_db.models import SimulationRun
-    
     # Verify run exists
     run = db.query(SimulationRun).filter(SimulationRun.id == run_id).first()
     if not run:
@@ -372,8 +364,6 @@ def compare_runs(run1_id: str, run2_id: str, db: Session = Depends(get_db)):
     Returns:
         Dict: Comparison results with shared states, unique states, and divergence point.
     """
-    from simulation_db.models import SimulationRun
-    
     # Verify both runs exist
     run1 = db.query(SimulationRun).filter(SimulationRun.id == run1_id).first()
     if not run1:
@@ -429,8 +419,6 @@ def create_branch(payload: BranchCreate, db: Session = Depends(get_db)):
     Returns:
         Dict: Created branch run ID and metadata.
     """
-    from simulation_db.models import SimulationRun, State
-    
     # Verify parent run exists
     parent_run = db.query(SimulationRun).filter(SimulationRun.id == payload.parent_run_id).first()
     if not parent_run:

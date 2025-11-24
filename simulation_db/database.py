@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from simulation_db.config import DATABASE_URL
 from simulation_db.models.base import Base
+from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set. Set it in environment or .env")
@@ -35,9 +36,6 @@ def drop_all_tables():
     
     Warning: This will delete all data in the database!
     """
-    # Import all models so they're registered with Base
-    from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
-    
     # Get or create engine
     db_engine = get_engine()
     
@@ -61,6 +59,4 @@ def init_db():
     
     Call this once to set up the schema. Safe to call multiple times.
     """
-    # Import all models so they're registered with Base
-    from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
     Base.metadata.create_all(bind=engine)

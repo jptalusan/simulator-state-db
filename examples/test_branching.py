@@ -6,11 +6,16 @@ This sets up a temporary SQLite database and runs the CartPole branching example
 
 import os
 import sys
-import tempfile
-# from pathlib import Path
+import time
+import traceback
 
-# Setup paths
-# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from sqlalchemy import create_engine, text
+
+from cartpole_branching_api_example import main as run_example
+from simulation_db.database import engine as db_engine
+from simulation_db.models.base import Base
+from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
+
 POSTGRES_USER = os.getenv("POSTGRES_USER", "simulation_user")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "change_me")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
@@ -36,21 +41,16 @@ def main():
     print("Tables ready!")
     print()
     
-    # Import and run the example
-    from cartpole_branching_api_example import main as run_example
-    
     try:
         run_example()
         print("\n✓ Test completed successfully!")
     except Exception as e:
         print(f"\n✗ Test failed with error: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
     finally:
         # Clean up database connections
         try:
-            from simulation_db.database import engine as db_engine
             if db_engine:
                 db_engine.dispose()
                 print("\nDatabase connections closed")
@@ -63,11 +63,6 @@ def drop_and_recreate_tables():
     This is safer for the API example since the FastAPI server can continue
     to use its existing database connection.
     """
-    from simulation_db.database import engine as db_engine
-    from simulation_db.models.base import Base
-    # Import all models so they're registered with Base
-    from simulation_db.models import State, Simulation, SimulationRun, run_state_sequence
-    
     # Drop all tables
     Base.metadata.drop_all(bind=db_engine)
     print("All tables dropped")
@@ -83,12 +78,8 @@ def drop_and_recreate_database():
     Warning: This will destroy all data!
     Note: If using with API server, you must restart the server after this.
     """
-    import time
-    from sqlalchemy import create_engine, text
-
     # First, dispose any existing connections from the database module
     try:
-        from simulation_db.database import engine as db_engine
         if db_engine:
             db_engine.dispose()
             print("Disposed existing database connections")

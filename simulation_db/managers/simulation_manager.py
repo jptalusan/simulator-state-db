@@ -1,10 +1,11 @@
 """High-level simulation management API (create runs, list runs, branch, etc.)."""
 
 from typing import Optional, Dict, Any, List
-from sqlalchemy.orm import Session
 from datetime import datetime
+from sqlalchemy import select, func, insert
+from sqlalchemy.orm import Session
 
-from ..models import Simulation, SimulationRun, State, run_state_sequence
+from simulation_db.models import Simulation, SimulationRun, State, run_state_sequence
 
 
 class SimulationManager:
@@ -120,7 +121,6 @@ class SimulationManager:
     ):
         """Add a new state to a run's sequence."""
         # Get current max sequence order for this run
-        from sqlalchemy import select, func
         stmt = (
             select(func.coalesce(func.max(run_state_sequence.c.sequence_order), -1))
             .where(run_state_sequence.c.run_id == run.id)
@@ -137,7 +137,6 @@ class SimulationManager:
     
     def _add_state_to_run(self, run_id: str, state_id: str, sequence_order: int):
         """Internal method to add state to run sequence."""
-        from sqlalchemy import insert
         stmt = insert(run_state_sequence).values(
             run_id=run_id,
             state_id=state_id,
@@ -147,7 +146,6 @@ class SimulationManager:
     
     def _get_run_states_until(self, run_id: str, until_state_id: str) -> List[str]:
         """Get ordered list of state IDs from a run up to (and including) a specific state."""
-        from sqlalchemy import select
         stmt = (
             select(run_state_sequence.c.state_id, run_state_sequence.c.sequence_order)
             .where(run_state_sequence.c.run_id == run_id)
